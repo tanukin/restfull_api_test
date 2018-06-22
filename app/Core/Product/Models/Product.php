@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Model;
+namespace App\Core\Product\Models;
 
+use App\Core\Review\Models\Review;
 use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model

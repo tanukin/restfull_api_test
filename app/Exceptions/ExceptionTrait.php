@@ -2,6 +2,8 @@
 
 namespace App\Exceptions;
 
+use App\Core\Product\Exceptions\ProductException;
+use Exception;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -18,6 +20,10 @@ trait ExceptionTrait
             return $this->httpResponse();
         }
 
+        if ($this->isProductException($exception)) {
+            return $this->productExceptionResponse($exception);
+        }
+
         return parent::render($request, $exception);
     }
 
@@ -31,6 +37,10 @@ trait ExceptionTrait
         return $exception instanceof NotFoundHttpException;
     }
 
+    protected function isProductException($exception): bool
+    {
+        return $exception instanceof ProductException;
+    }
 
     protected function modelResponse()
     {
@@ -44,5 +54,12 @@ trait ExceptionTrait
         return response()->json([
             'error' => 'Incorrect route'
         ], Response::HTTP_NOT_FOUND);
+    }
+
+    protected function productExceptionResponse(Exception $exception)
+    {
+        return response()->json([
+            'error' => $exception->getMessage()
+        ], Response::HTTP_BAD_REQUEST);
     }
 }

@@ -2,50 +2,58 @@
 
 namespace App\Http\Controllers\Product;
 
-use App\Exceptions\ProductNotBelongsToUser;
+use App\Core\Product\Exceptions\ProductException;
+use App\Core\Product\Exceptions\ProductNotBelongsToUser;
+use App\Core\Product\Services\ProductService;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\PaginationRequest;
 use App\Http\Requests\ProductRequest;
 use App\Http\Resources\Product\ProductCollection;
 use App\Http\Resources\Product\ProductResource;
-use App\Model\Product;
+use App\Core\Product\Models\Product;
 use Auth;
-use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 class ProductController extends Controller
 {
+    /**
+     * @var ProductService
+     */
+    private $service;
 
-    public function __construct()
+    /**
+     * @param ProductService $service
+     */
+    public function __construct(ProductService $service)
     {
         $this->middleware('auth:api')->except('index', 'show');
+        $this->service = $service;
     }
 
     /**
-     * Display a listing of the resource.
+     * @param PaginationRequest $request
      *
-     * @return \Illuminate\Http\Response
+     * @return Response
      */
-    public function index()
+    public function index(PaginationRequest $request)
     {
-        return ProductCollection::collection(Product::paginate(10));
+        $products = $this->service->getProducts($request);
+
+        $collection = ProductCollection::collection($products);
+
+        return response()->json($collection, Response::HTTP_OK);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * @param ProductRequest $request
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
+     * @return Response
+     *
+     * @throws ProductException
      */
     public function store(ProductRequest $request)
     {
-        $product = new Product();
-        $product->name = $request->name;
-        $product->detail = $request->description;
-        $product->price = $request->price;
-        $product->stock = $request->stock;
-        $product->discount = $request->discount;
-
-        $product->save();
+        $product = $this->service->create($request);
 
         return response([
             'data' => new ProductResource($product)
@@ -53,30 +61,31 @@ class ProductController extends Controller
     }
 
     /**
-     * Display the specified resource.
+     * @param  int $id
      *
-     * @param  \App\Model\Product  $product
-     * @return \Illuminate\Http\Response
+     * @return ProductResource
      */
-    public function show(Product $product)
+    public function show(int $id)
     {
+        $product = $this->service->getProduct($id);
+
         return new ProductResource($product);
     }
 
     /**
-     * Update the specified resource in storage.
+     * @param  ProductRequest $request
+     * @param  int $id
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Model\Product  $product
-     * @return \Illuminate\Http\Response
+     * @return Response
+     *
+     * @throws ProductException
      */
-    public function update(Request $request, Product $product)
+    public function update(ProductRequest $request, int $id)
     {
+        $product = $this->service->getProduct($id);
         $this->productUserCheck($product);
-        $request['detail'] = $request->description;
-        unset($request['description']);
 
-        $product->update($request->all());
+        $product = $this->service->update($request, $product);
 
         return response([
             'data' => new ProductResource($product)
@@ -84,24 +93,28 @@ class ProductController extends Controller
     }
 
     /**
-     * Remove the specified resource from storage.
+     * @param int $id
      *
-     * @param  \App\Model\Product  $product
-     * @return \Illuminate\Http\Response
+     * @return Response
+     *
+     * @throws ProductException
      */
-    public function destroy(Product $product)
+    public function destroy(int $id)
     {
-        $product->delete();
+        $this->service->delete($id);
 
-        return response('', Response::HTTP_NO_CONTENT);
+        return response(null, Response::HTTP_NO_CONTENT);
     }
 
-    protected function productUserCheck($product): bool
+    /**
+     * @param Product $product
+     *
+     * @throws ProductNotBelongsToUser
+     */
+    protected function productUserCheck(Product $product)
     {
         if (Auth::id() !== $product->user_id) {
-            throw new ProductNotBelongsToUser;
+            throw new ProductNotBelongsToUser('Product not belongs to user');
         }
-
-        return true;
     }
 }

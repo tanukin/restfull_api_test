@@ -15,6 +15,7 @@ class ProductCollection extends Resource
     public function toArray($request)
     {
         return [
+            'id' => $this->id,
             'name' => $this->name,
             'totalPrice' => round((1 - ($this->discount/100)) * $this->price, 2),
             'rating' => $this->reviews->count() > 0 ?
