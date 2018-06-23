@@ -2,47 +2,57 @@
 
 namespace App\Http\Controllers\Product;
 
+use App\Core\Product\Models\Product;
+use App\Core\Review\Exceptions\ReviewException;
+use App\Core\Review\Exceptions\ReviewNotBelongsToProduct;
+use App\Core\Review\Services\ReviewService;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\PaginationRequest;
 use App\Http\Requests\ReviewRequest;
 use App\Http\Resources\ReviewResource;
-use App\Model\Product;
-use App\Model\Review;
-use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 class ReviewController extends Controller
 {
     /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
+     * @var ReviewService
      */
-    public function index(Product $product)
+    private $service;
+
+    /**
+     * ReviewController constructor.
+     *
+     * @param ReviewService $service
+     */
+    public function __construct(ReviewService $service)
     {
-        return ReviewResource::collection($product->reviews);
+        $this->middleware('auth:api')->except('index', 'show');
+        $this->service = $service;
     }
 
     /**
-     * Show the form for creating a new resource.
+     * @param PaginationRequest $request
+     * @param int $productId
      *
-     * @return \Illuminate\Http\Response
+     * @return Response
      */
-    public function create()
+    public function index(PaginationRequest $request, int $productId)
     {
-        //
+        $reviews = $this->service->getReviews($request, $productId);
+        $reviews = ReviewResource::collection($reviews);
+
+        return response()->json($reviews, Response::HTTP_OK);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * @param  ReviewRequest $request
+     * @param Product $product
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Model\Product  $product
-     * @return \Illuminate\Http\Response
+     * @return Response
      */
     public function store(ReviewRequest $request, Product $product)
     {
-        $review = new Review($request->all());
-        $product->reviews()->save($review);
+        $review = $this->service->create($request, $product->id);
 
         return response([
             'data' => new ReviewResource($review)
@@ -50,26 +60,36 @@ class ReviewController extends Controller
     }
 
     /**
-     * Display the specified resource.
+     * @param int $productId
+     * @param int $reviewId
      *
-     * @param  \App\Model\Review  $review
-     * @return \Illuminate\Http\Response
+     * @return Response
+     *
+     * @throws ReviewException
      */
-    public function show(Review $review)
+    public function show(int $productId, int $reviewId)
     {
-        //
+        $this->isReviewBelongsToProduct($productId, $reviewId);
+
+        $review = $this->service->getReview($reviewId);
+
+        return response()->json($review, Response::HTTP_OK);
     }
 
     /**
-     * Update the specified resource in storage.
+     * @param ReviewRequest $request
+     * @param int $productId
+     * @param int $reviewId
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Model\Review  $review
-     * @return \Illuminate\Http\Response
+     * @return Response
+     *
+     * @throws ReviewException
      */
-    public function update(Request $request, Product $product, Review $review)
+    public function update(ReviewRequest $request, int $productId, int $reviewId)
     {
-        $review->update($request->all());
+        $this->isReviewBelongsToProduct($productId, $reviewId);
+
+        $review = $this->service->update($request, $reviewId);
 
         return response([
             'data' => new ReviewResource($review)
@@ -77,15 +97,38 @@ class ReviewController extends Controller
     }
 
     /**
-     * Remove the specified resource from storage.
+     * @param int $productId
+     * @param int $reviewId
      *
-     * @param  \App\Model\Review  $review
-     * @return \Illuminate\Http\Response
+     * @return Response
+     *
+     * @throws ReviewException
      */
-    public function destroy(Product $product, Review $review)
+    public function destroy(int $productId, int $reviewId)
     {
-        $review->delete();
+        $this->isReviewBelongsToProduct($productId, $reviewId);
+
+        $this->service->delete($reviewId);
 
         return response(null, Response::HTTP_NO_CONTENT);
+    }
+
+    /**
+     * @param int $productId
+     * @param int $reviewId
+     *
+     * @throws ReviewNotBelongsToProduct
+     */
+    protected function isReviewBelongsToProduct(int $productId, int $reviewId)
+    {
+        $review = $this->service->getReview($reviewId);
+
+        if ($review->product_id !== $productId) {
+            throw new ReviewNotBelongsToProduct(sprintf(
+                'Review %d not belongs to product %d',
+                $review->id,
+                $productId
+            ));
+        }
     }
 }

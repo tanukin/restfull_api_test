@@ -3,6 +3,7 @@
 namespace App\Exceptions;
 
 use App\Core\Product\Exceptions\ProductException;
+use App\Core\Review\Exceptions\ReviewException;
 use Exception;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Response;
@@ -20,8 +21,8 @@ trait ExceptionTrait
             return $this->httpResponse();
         }
 
-        if ($this->isProductException($exception)) {
-            return $this->productExceptionResponse($exception);
+        if ($this->isProductException($exception) || $this->isReviewException($exception)) {
+            return $this->exceptionResponse($exception);
         }
 
         return parent::render($request, $exception);
@@ -42,6 +43,11 @@ trait ExceptionTrait
         return $exception instanceof ProductException;
     }
 
+    protected function isReviewException($exception): bool
+    {
+        return $exception instanceof ReviewException;
+    }
+
     protected function modelResponse()
     {
         return response()->json([
@@ -56,7 +62,7 @@ trait ExceptionTrait
         ], Response::HTTP_NOT_FOUND);
     }
 
-    protected function productExceptionResponse(Exception $exception)
+    protected function exceptionResponse(Exception $exception)
     {
         return response()->json([
             'error' => $exception->getMessage()
