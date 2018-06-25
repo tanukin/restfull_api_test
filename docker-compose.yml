@@ -1,0 +1,38 @@
+version: '2'
+
+services:
+  restfull_app:
+    build: ./docker-files/api
+    container_name: appRestfull
+    environment:
+        - XDEBUG_HOST=${XDEBUG_HOST}
+        - XDEBUG_PORT=${XDEBUG_PORT}
+        - XDEBUG_IDE_KEY=${XDEBUG_IDE_KEY}
+    depends_on:
+        - restfull_db
+    volumes:
+        - .:/var/www
+    networks:
+        - backend
+    ports:
+         - 8000:80
+
+  restfull_db:
+    image: postgres:9.5.6
+    container_name: postgresResfull
+    ports:
+      - "5432:5432"
+    environment:
+        - POSTGRES_USER=${DB_USERNAME}
+        - POSTGRES_PASSWORD=${DB_PASSWORD}
+        - POSTGRES_DB=${DB_DATABASE}
+    volumes:
+        - ./storage/postgresql:/var/lib/postgresql
+    networks:
+        - backend
+
+networks:
+    default:
+        driver: bridge
+    backend:
+        external: true
